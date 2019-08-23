@@ -226,13 +226,14 @@ func (s *ApiServer) AuthenticateEmail(ctx context.Context, in *api.AuthenticateE
 	var created bool
 	var err error
 
+	create := in.Create == nil || in.Create.Value
+
 	if attemptUsernameLogin {
 		// Attempting to log in with username/password. Create flag is ignored, creation is not possible here.
-		dbUserID, err = AuthenticateUsername(ctx, s.logger, s.db, username, email.Password)
+		dbUserID, err = AuthenticateUsername(ctx, s.logger, s.db, username, email.Password, create)
 	} else {
 		// Attempting email authentication, may or may not create.
 		cleanEmail := strings.ToLower(email.Email)
-		create := in.Create == nil || in.Create.Value
 
 		dbUserID, username, created, err = AuthenticateEmail(ctx, s.logger, s.db, cleanEmail, email.Password, username, create)
 	}

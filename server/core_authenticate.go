@@ -276,7 +276,32 @@ func AuthenticateEmail(ctx context.Context, logger *zap.Logger, db *sql.DB, emai
 	return userID, username, true, nil
 }
 
-func AuthenticateUsername(ctx context.Context, logger *zap.Logger, db *sql.DB, username, password string) (string, error) {
+func CreateNewAcc(ctx context.Context, logger *zap.Logger, db *sql.DB, username, password string)(string, error){
+	// Create a new account.
+	userID := uuid.Must(uuid.NewV4()).String()
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	query := "INSERT INTO users (id, username, password, create_time, update_time) VALUES ($1, $2, $3, now(), now())"
+	result, err := db.ExecContext(ctx, query, userID, username, hashedPassword)
+	if err != nil {
+		if e, ok := err.(*pq.Error); ok && e.Code == dbErrorUniqueViolation {
+			if strings.Contains(e.Message, "users_username_key") {
+				// Username is already in use by a different account.
+				return "", status.Error(codes.AlreadyExists, "Username is already in use.")
+			}
+		}
+		logger.Error("Cannot find or create user with username.", zap.Error(err), zap.String("username", username))
+		return "", status.Error(codes.Internal, "Error finding or creating user account.")
+	}
+
+	if rowsAffectedCount, _ := result.RowsAffected(); rowsAffectedCount != 1 {
+		logger.Error("Did not insert new user.", zap.Int64("rows_affected", rowsAffectedCount))
+		return "", status.Error(codes.Internal, "Error finding or creating user account.")
+	}
+
+	return userID, nil
+}
+
+func AuthenticateUsername(ctx context.Context, logger *zap.Logger, db *sql.DB, username, password string, create bool) (string, error) {
 	// Look for an existing account.
 	query := "SELECT id, password, disable_time FROM users WHERE username = $1"
 	var dbUserID string
@@ -286,7 +311,10 @@ func AuthenticateUsername(ctx context.Context, logger *zap.Logger, db *sql.DB, u
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Account not found and creation is never allowed for this type.
-			return "", status.Error(codes.NotFound, "User account not found.")
+			if !create {
+				return "", status.Error(codes.NotFound, "User account not found.")
+			}
+			return CreateNewAcc(ctx, logger, db, username, password)
 		} else {
 			logger.Error("Error looking up user by username.", zap.Error(err), zap.String("username", username))
 			return "", status.Error(codes.Internal, "Error finding user account.")

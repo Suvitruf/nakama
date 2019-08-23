@@ -148,7 +148,7 @@ func (n *RuntimeGoNakamaModule) AuthenticateEmail(ctx context.Context, email, pa
 	}
 
 	if attemptUsernameLogin {
-		dbUserID, err := AuthenticateUsername(ctx, n.logger, n.db, username, password)
+		dbUserID, err := AuthenticateUsername(ctx, n.logger, n.db, username, password, create)
 		return dbUserID, username, false, err
 	}
 

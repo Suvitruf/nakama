@@ -1257,7 +1257,7 @@ func (n *RuntimeLuaNakamaModule) authenticateEmail(l *lua.LState) int {
 	var err error
 
 	if attemptUsernameLogin {
-		dbUserID, err = AuthenticateUsername(l.Context(), n.logger, n.db, username, password)
+		dbUserID, err = AuthenticateUsername(l.Context(), n.logger, n.db, username, password, create)
 	} else {
 		cleanEmail := strings.ToLower(email)
 
